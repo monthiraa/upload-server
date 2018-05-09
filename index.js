@@ -11,6 +11,7 @@ const mongoose = require('mongoose');
 const Service = require('./models/service');
 const Media = require('./models/media');
 const exec = require('child_process').exec;
+var qs = require('querystring');
 
 mongoose.connect(mongoDB);
 mongoose.Promise = global.Promise;
@@ -18,10 +19,10 @@ var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
 app.use(express.static('public'));
+app.use(bodyParser.raw("application/from-data"))
 app.use(bodyParser.urlencoded({
   extended: true
 }));
-
 var urlencodedParser = bodyParser.urlencoded({
   extended: false
 })
@@ -30,8 +31,7 @@ app.get('/index.html', function(req, res) {
   res.sendFile(__dirname + "/" + "index.html");
 })
 
-app.post('/service', urlencodedParser, function(req, res) {
-
+app.post('/service', urlencodedParser,function(req, res) {
   const serviceKey = uuid(req.body.name);
   const secretKey = uuid();
   const nameService = req.body.name;
@@ -46,13 +46,14 @@ app.post('/service', urlencodedParser, function(req, res) {
   Service.create(response, function(err, data) {
     console.log('data', data);
     console.log(err);
-    res.send(JSON.stringify(response));
-    // if (err) return handleError(err);
+    res.send(data);
   });
-  // res.end(JSON.stringify(response));
 })
 
 app.post('/upload', (req, res) => {
+  // console.log('req', req.);
+  // res.send(req)
+  // console.log();
   let dir;
   var busboy = new Busboy({
     headers: req.headers
@@ -70,10 +71,10 @@ app.post('/upload', (req, res) => {
         mimetype: mimetype
       };
       // Media.create({
-      //   // host: ,
-      //   // path: ,
-      //   // type: ,
-      //   // projectId:
+      //   host: ,
+      //   path: ,
+      //   type: ,
+      //   projectId:
       // })
       result.push(data);
       file.on('end', function() {
@@ -81,16 +82,20 @@ app.post('/upload', (req, res) => {
       });
     }
   });
-
+  busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
+       console.log('Field ',fieldname, val);
+     });
   busboy.on('finish', function() {
     console.log(result);
     console.log('Done parsing form!');
-    checkType(result);
+    // checkType(result);
     // res.writeHead(303, {
     //   Connection: 'close',
     //   Location: '/'
     // });
     return res.end();
+    return res.send('Success');
+
   });
   req.pipe(busboy);
 })
@@ -123,19 +128,13 @@ function resizeImageSmall(url) {
 }
 
 function coverVideo(url) {
-  // use command ffmpeg create cover
-  // const mp4 = ‘/var/www / vod / 001. mp4’;
   let filename = url.path.split('/');
   filename = filename[7].split('.');
   console.log('filename', filename);
   const coverSmall = __dirname + '/uploads/coverVideoSmall/' + filename[0] + '.jpg';
 
   console.log('coverSmall', coverSmall, url.path);
-  //small covers
-  // exec(`ffmpeg -ss 00:00:01 -i "${url.path}" -vframes 1 -q:v 2 ${coverSmall}`)
   exec(`ffmpeg -loglevel debug -y -i "${url.path}" -frames 10 -q:v 1 -vf fps=1 ${coverSmall}`);
-  //Big & small covers
-  // exec(`/usr/local/ffmpeg -loglevel panic -y -i "${url.path}" -frames 1 -q:v 1 -vf fps=1,scale=535x346 ${previewBig} -frames 1 -q:v 1 -vf fps=1,scale=200x130 ${previewSmall}`);
 }
 
 var server = app.listen(8081, function() {
