@@ -1,7 +1,7 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
-var imageSchema = new Schema({
+var coverSchema = new Schema({
   host: {
     type: Schema.Types.String
   },
@@ -34,5 +34,5 @@ var imageSchema = new Schema({
 });
 
 // Compile model from schema
-var Image = mongoose.model('Image', imageSchema);
-module.exports = Image;
+var Cover = mongoose.model('Cover', coverSchema);
+module.exports = Cover;
