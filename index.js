@@ -15,6 +15,7 @@ const Cover = require('./models/Cover');
 const async = require('async');
 const exec = require('child_process').exec;
 const qs = require('querystring');
+const Profile = require('./models/profile');
 
 mongoose.connect(mongoDB);
 mongoose.Promise = global.Promise;
@@ -52,51 +53,44 @@ app.post('/service', urlencodedParser, function(req, res) {
 })
 
 // Create profile
-app.post('/profile', urlencodedParser, function(req, res) {
+app.post('/profile',  async function(req, res) {
 
 let queryString = {
   serviceKey: req.body.serviceKey,
   secretKey: req.body.secretKey 
-} 
+}    
 
-  Service.findOne(queryString, function(err ,serviceData){
-    if(err){
-      res.status(422).send({ error: 'Not found service key' })
-    }else{
-        if(serviceData != null && serviceData != undefined){
-      
-        let profileParam = {
-              serviceId: serviceData._id,
-              mediaType : req.body.mediaTypex,
-              name: req.body.name,
-              config : {
-                width : req.body.width,
-                height : req.body.height,
-                quality : req.body.quality,
-                outputType: req.body.outputType
-              },
-              path:'/uploads'
-        };
-      
-        Profile.create(profileParam , function(err, data) {
-          if(err){
-            res.status(422).send({ error: 'Cannot create profile' })
-          }else{
-            res.send(data);
-          }
-        });
-
-        }else{
-          res.status(422).send({ error: 'Not found service key' })
-        }
-    }
-  })
+  let serviceData  =  await  checkService(queryString)
+  if(serviceData != null && serviceData != undefined){
+          let profileParam = {
+                serviceId: serviceData._id,
+                mediaType : req.body.mediaTypex,
+                name: req.body.name,
+                config : {
+                  width : req.body.width,
+                  height : req.body.height,
+                  quality : req.body.quality,
+                  outputType: req.body.outputType
+                },
+                path:'/uploads'
+          };
+  
+          Profile.create(profileParam , function(err, data) {
+            if(err){
+              res.status(422).send({ error: 'Cannot create profile' })
+            }else{
+              res.send(data);
+            }
+          });
+  
+   }else{
+            res.status(422).send({ error: 'Not found service key' })
+  }
 
 })
 
 
 app.post('/upload', async (req, res) => {
-  // console.log("------body: "+req.body);
   let dir;
   var busboy = new Busboy({
     headers: req.headers
@@ -109,6 +103,17 @@ app.post('/upload', async (req, res) => {
     data[fieldname] = val;
     await busboy.on('field', async () => {
       service = await checkService(data);
+      if (!service) {
+        res.writeHead(500, {
+          'Connection': 'close'
+        });
+        res.end({
+          error: {
+            errorCode: 500,
+            message: 'Service not found'
+          }
+        });
+      }
     });
   });
 
@@ -135,23 +140,38 @@ app.post('/upload', async (req, res) => {
   })
 
   busboy.on('finish', async () => {
-    if (service && data) {
-      if (data.mimetype === "video/mp4") {
-        const coverVod = await coverVideo(data.path);
-        const cover = await createCover(coverVod, service);
-        const video = await createVideo(data, cover._id, service);
-        const myVideo = await findVideo(video._id)
-        res.send(myVideo);
+    try {
+      if (service && data) {
+        if (data.mimetype === "video/mp4") {
+          const coverVod = await coverVideo(data.path);
+          const cover = await createCover(coverVod, service);
+          const video = await createVideo(data, cover._id, service);
+          const myVideo = await findVideo(video._id)
+          res.send(myVideo);
+        } else {
+          const image = await createImage(data, service);
+          res.send(image);
+        }
       } else {
-        const image = await createImage(data, service);
-        res.send(image);
+        res.writeHead(500, {
+          'Connection': 'close'
+        });
+        res.end({
+          error: {
+            errorCode: 500,
+            message: 'Upload fail'
+          }
+        });
+
       }
+    } catch (e) {
+      // console.log(e);
     }
   });
   req.pipe(busboy);
 })
 
-function checkService(service) {
+function checkService(service, res) {
   const serv = Service.findOne(service);
   return serv;
 }
@@ -174,7 +194,9 @@ function findVideo(videoId) {
     .populate({
       path: 'coverId',
       model: 'Cover',
-      match: { deleted: false },
+      match: {
+        deleted: false
+      },
     });
   return video;
 }
@@ -233,6 +255,7 @@ function resizeImageSmall(url) {
         .write(`${pathSmall}`); // set JPEG quality })
     })
 }
+
 
 
 
