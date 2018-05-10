@@ -53,7 +53,7 @@ app.post('/service', urlencodedParser, function(req, res) {
 })
 
 // Create profile
-app.post('/profile',  async function(req, res) {
+app.post('/profile',  async (req, res) => {
 
 let queryString = {
   serviceKey: req.body.serviceKey,
@@ -75,7 +75,7 @@ let queryString = {
                 path:'/uploads'
           };
   
-          Profile.create(profileParam , function(err, data) {
+          Profile.create(profileParam , (err, data) => {
             if(err){
               res.status(422).send({ error: 'Cannot create profile' })
             }else{
