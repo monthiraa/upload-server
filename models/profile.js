@@ -5,7 +5,9 @@ var profileSchema = new Schema({
   mediaType: {
     type: Schema.Types.String,
   },
-  name: Schema.Types.String,
+  name: {
+    type: Schema.Types.String,
+  },
   saveDist: {
     type: Schema.Types.Boolean,
     default : false
