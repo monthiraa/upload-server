@@ -150,15 +150,14 @@ function createCover(cover, service) {
 function coverVideo(url) {
   let filename = url.split('/');
   filename = filename[7].split('.');
-  const coverSmall = __dirname + '/uploads/coverVideoSmall/' + filename[0] + '.jpg';
-  exec(`ffmpeg -loglevel debug -y -i "${url}" -frames 10 -q:v 1 -vf fps=1 ${coverSmall}`);
+  const coverPath = __dirname + '/uploads/coverVideoOriginal/' + filename[0] + '.jpg';
+  exec(`ffmpeg -loglevel debug -y -i "${url}" -frames 10 -q:v 1 -vf fps=1 ${coverPath}`);
   const result = {
-    path: coverSmall,
+    path: coverPath,
     fileName: filename[0] + '.jpg',
     mimetype: 'image/jpg'
   }
   return result;
-
 }
 
 function createImage(data, service) {
