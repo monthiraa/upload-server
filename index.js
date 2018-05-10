@@ -13,6 +13,7 @@ const Media = require('./models/media');
 const async = require('async');
 const exec = require('child_process').exec;
 var qs = require('querystring');
+const Profile = require('./models/profile');
 
 mongoose.connect(mongoDB);
 mongoose.Promise = global.Promise;
@@ -51,6 +52,96 @@ app.post('/service', urlencodedParser, function(req, res) {
   });
 })
 
+// Create profile
+app.post('/profile', urlencodedParser, function(req, res) {
+ // mock up
+ let serviceParam = {
+    serviceKey: uuid('sararons'),
+    secretKey: uuid(),
+    path: '/someWhere',
+    name: 'sararons'
+  }
+
+  Service.create(serviceParam , function(err, service) {
+     if(err) {
+      console.error(err.stack)
+      res.status(500).send('Error can not create data')
+     }
+     else{
+
+      response = {
+        serviceId: service._id,
+        mediaType : req.body.mediaTypex,
+        name: req.body.name,
+        config : {
+          width : req.body.width,
+          height : req.body.height,
+          quality : req.body.quality,
+          outputType: req.body.outputType
+        },
+        path:'/uploads'
+      };
+    
+      Profile.create(response, function(err, data) {
+        console.log('data', data);
+        res.send(data);
+      });
+   
+    }
+  }); //  end create
+
+
+})
+
+app.get('/file' , (req , res) => {
+
+  fs.readFile("uploads/videoOriginal/a1908289-09f8-4784-971c-3e34a15fc0b1.mp4", "utf8", function(err, data){
+    if(err) throw err;
+     
+  console.log(data);
+  //  var resultArray = //do operation on data that generates say resultArray;
+  console.log("file");
+  res.send("get file");
+    
+ });
+
+
+})
+
+app.post('/up',(req, res) => {
+
+  var busboy = new Busboy({
+    headers: req.headers
+  });
+
+
+  busboy.on('field',(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) => {
+     res.status(500).send({ error: "Your image was incorrect"});
+  // //  res.end();
+  //    return; // THIS IS VERY IMPORTANT!
+     
+});
+
+  busboy.on('finish', function() {
+    // console.log(result);
+    try{
+     res.send('Success');
+    }catch(ex){
+      console.log("catch error");
+    }
+
+  });
+
+
+  
+
+
+
+
+  req.pipe(busboy);
+})
+
+
 app.post('/upload', async (req, res) => {
   // console.log("------body: "+req.body);
   let dir;
@@ -67,7 +158,8 @@ app.post('/upload', async (req, res) => {
     await busboy.on('field', async (fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) => {
       serviceKey = await Service.findOne(data);
       console.log('========2==========');
-      res.end();
+         res.status(500).send({ error: "Your image was incorrect"});
+      //return; // THIS IS VERY IMPORTANT!
     });
   });
 
@@ -99,6 +191,7 @@ app.post('/upload', async (req, res) => {
 
   busboy.on('finish', function() {
     // console.log(result);
+    try{
     console.log('Done parsing form!');
     // checkType(result);
     // res.writeHead(303, {
@@ -107,6 +200,9 @@ app.post('/upload', async (req, res) => {
     // });
     // return res.end();
     return res.send('Success');
+    }catch(ex){
+      console.log("error");
+    }
 
   });
   req.pipe(busboy);

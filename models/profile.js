@@ -5,19 +5,20 @@ var profileSchema = new Schema({
   mediaType: {
     type: Schema.Types.String,
   },
+  name: Schema.Types.String,
   saveDist: {
-    type: Schema.Types.Boolean
+    type: Schema.Types.Boolean,
+    default : false
   },
   config: {
-    type: {
        width: {type: Schema.Types.Number},
        height: {type: Schema.Types.Number},
        quality: {type: Schema.Types.Number},
        outputType: {type: Schema.Types.String}
-       }
     },
   deletetd: {
-    type :Schema.Types.Boolean
+    type :Schema.Types.Boolean,
+    default : false
   },
   path: {
     type: Schema.Types.String,
@@ -27,8 +28,7 @@ var profileSchema = new Schema({
     default: Date.now
   },
   updateAt: {
-    type: Schema.Types.Date,
-    default: Date.now
+    type: Schema.Types.Date
   },  
   serviceId: {
     type: Schema.Types.ObjectId,
