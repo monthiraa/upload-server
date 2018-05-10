@@ -4,15 +4,9 @@ var Schema = mongoose.Schema;
 var mediaSchema = new Schema({
   host: {
     type: Schema.Types.String,
-    required: true
   },
   path: {
-    type: Schema.Types.String,
-    required: true
-  },
-  type: {
-    type: Schema.Types.String,
-    required: true
+    type: Schema.Types.String
   },
   serviceId: {
     type: Schema.Types.ObjectId,

@@ -10,6 +10,7 @@ const mongoDB = 'mongodb://127.0.0.1/media';
 const mongoose = require('mongoose');
 const Service = require('./models/service');
 const Media = require('./models/media');
+const async = require('async');
 const exec = require('child_process').exec;
 var qs = require('querystring');
 
@@ -31,7 +32,7 @@ app.get('/index.html', function(req, res) {
   res.sendFile(__dirname + "/" + "index.html");
 })
 
-app.post('/service', urlencodedParser,function(req, res) {
+app.post('/service', urlencodedParser, function(req, res) {
   const serviceKey = uuid(req.body.name);
   const secretKey = uuid();
   const nameService = req.body.name;
@@ -50,16 +51,29 @@ app.post('/service', urlencodedParser,function(req, res) {
   });
 })
 
-app.post('/upload', (req, res) => {
-  // console.log('req', req.);
-  // res.send(req)
-  // console.log();
+app.post('/upload', async (req, res) => {
+  // console.log("------body: "+req.body);
   let dir;
   var busboy = new Busboy({
     headers: req.headers
   });
+  let data = {}
+  let media = {}
   const result = [];
-  busboy.on('file', function(fieldname, file, filename, encoding, mimetype) {
+  let serviceKey = {};
+  await busboy.on('field', async (fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) => {
+    data[fieldname] = val;
+    console.log('========1==========');
+    await busboy.on('field', async (fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) => {
+      serviceKey = await Service.findOne(data);
+      console.log('========2==========');
+      res.end();
+    });
+  });
+
+  await busboy.on('file', async (fieldname, file, filename, encoding, mimetype) => {
+    console.log('========3==========');
+    console.log('serviceKey', serviceKey);
     if (mimetype === "image/jpeg" || mimetype === "image/png" || mimetype === "video/mp4") {
       const pathFloder = mimetype === "video/mp4" ? '/uploads/videoOriginal/' : '/uploads/imageOriginal/';
       const file_ext = filename.split('.').pop();
@@ -70,35 +84,37 @@ app.post('/upload', (req, res) => {
         path: dir,
         mimetype: mimetype
       };
-      // Media.create({
-      //   host: ,
-      //   path: ,
-      //   type: ,
-      //   projectId:
-      // })
       result.push(data);
       file.on('end', function() {
         console.log('Finished');
       });
     }
-  });
-  busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
-       console.log('Field ',fieldname, val);
-     });
+  })
+
+  //   -F upload=@/Users/slim/Desktop/S__29261855.jpg \
+  // curl -v \
+  // -F serviceKey=bb29038a-78a1-49e6-b18e-60201bb4e557 \
+  // -F secretKey=4befb4af-867b-46f0-bec0-f42da96ffc95 \
+  // http://127.0.0.1:8081/upload
+
   busboy.on('finish', function() {
-    console.log(result);
+    // console.log(result);
     console.log('Done parsing form!');
     // checkType(result);
     // res.writeHead(303, {
     //   Connection: 'close',
     //   Location: '/'
     // });
-    return res.end();
+    // return res.end();
     return res.send('Success');
 
   });
   req.pipe(busboy);
 })
+
+function createMedia(obj) {
+  Media.create(obj)
+}
 
 function checkType(path) {
   path.map(url => {
