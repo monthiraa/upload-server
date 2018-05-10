@@ -15,6 +15,7 @@ const Cover = require('./models/Cover');
 const async = require('async');
 const exec = require('child_process').exec;
 const qs = require('querystring');
+const Profile = require('./models/profile');
 
 mongoose.connect(mongoDB);
 mongoose.Promise = global.Promise;
@@ -50,6 +51,44 @@ app.post('/service', urlencodedParser, function(req, res) {
     res.send(data);
   });
 })
+
+// Create profile
+app.post('/profile',  async (req, res) => {
+
+let queryString = {
+  serviceKey: req.body.serviceKey,
+  secretKey: req.body.secretKey 
+}    
+
+  let serviceData  =  await  checkService(queryString)
+  if(serviceData != null && serviceData != undefined){
+          let profileParam = {
+                serviceId: serviceData._id,
+                mediaType : req.body.mediaTypex,
+                name: req.body.name,
+                config : {
+                  width : req.body.width,
+                  height : req.body.height,
+                  quality : req.body.quality,
+                  outputType: req.body.outputType
+                },
+                path:'/uploads'
+          };
+  
+          Profile.create(profileParam , (err, data) => {
+            if(err){
+              res.status(422).send({ error: 'Cannot create profile' })
+            }else{
+              res.send(data);
+            }
+          });
+  
+   }else{
+            res.status(422).send({ error: 'Not found service key' })
+  }
+
+})
+
 
 app.post('/upload', async (req, res) => {
   let dir;
