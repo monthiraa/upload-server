@@ -9,10 +9,12 @@ const Jimp = require('jimp');
 const mongoDB = 'mongodb://127.0.0.1/media';
 const mongoose = require('mongoose');
 const Service = require('./models/service');
-const Media = require('./models/media');
+const Image = require('./models/image');
+const Video = require('./models/Video');
+const Cover = require('./models/Cover');
 const async = require('async');
 const exec = require('child_process').exec;
-var qs = require('querystring');
+const qs = require('querystring');
 
 mongoose.connect(mongoDB);
 mongoose.Promise = global.Promise;
@@ -45,8 +47,6 @@ app.post('/service', urlencodedParser, function(req, res) {
   };
 
   Service.create(response, function(err, data) {
-    console.log('data', data);
-    console.log(err);
     res.send(data);
   });
 })
@@ -57,75 +57,123 @@ app.post('/upload', async (req, res) => {
   var busboy = new Busboy({
     headers: req.headers
   });
-  let data = {}
-  let media = {}
-  const result = [];
-  let serviceKey = {};
+  let data = {};
+  let cover;
+  let service;
+  let sumSize = 0;
   await busboy.on('field', async (fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) => {
     data[fieldname] = val;
-    console.log('========1==========');
-    await busboy.on('field', async (fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) => {
-      serviceKey = await Service.findOne(data);
-      console.log('========2==========');
-      res.end();
+    await busboy.on('field', async () => {
+      service = await checkService(data);
     });
   });
 
   await busboy.on('file', async (fieldname, file, filename, encoding, mimetype) => {
-    console.log('========3==========');
-    console.log('serviceKey', serviceKey);
     if (mimetype === "image/jpeg" || mimetype === "image/png" || mimetype === "video/mp4") {
       const pathFloder = mimetype === "video/mp4" ? '/uploads/videoOriginal/' : '/uploads/imageOriginal/';
       const file_ext = filename.split('.').pop();
       const newFile = uuid();
       dir = __dirname + pathFloder + newFile + '.' + file_ext;
       file.pipe(fs.createWriteStream(dir));
-      const data = {
-        path: dir,
-        mimetype: mimetype
-      };
-      result.push(data);
-      file.on('end', function() {
-        console.log('Finished');
+      file.on('data', data => {
+        sumSize = sumSize + data.length;
+      });
+      file.on('end', () => {
+        data = {
+          path: dir,
+          mimetype: mimetype,
+          size: sumSize,
+          fileName: newFile + '.' + file_ext,
+          type: file_ext
+        };
       });
     }
   })
 
-  //   -F upload=@/Users/slim/Desktop/S__29261855.jpg \
-  // curl -v \
-  // -F serviceKey=bb29038a-78a1-49e6-b18e-60201bb4e557 \
-  // -F secretKey=4befb4af-867b-46f0-bec0-f42da96ffc95 \
-  // http://127.0.0.1:8081/upload
-
-  busboy.on('finish', function() {
-    // console.log(result);
-    console.log('Done parsing form!');
-    // checkType(result);
-    // res.writeHead(303, {
-    //   Connection: 'close',
-    //   Location: '/'
-    // });
-    // return res.end();
-    return res.send('Success');
-
+  busboy.on('finish', async () => {
+    if (service && data) {
+      if (data.mimetype === "video/mp4") {
+        const coverVod = await coverVideo(data.path);
+        const cover = await createCover(coverVod, service);
+        const video = await createVideo(data, cover._id, service);
+        const myVideo = await findVideo(video._id)
+        res.send(myVideo);
+      } else {
+        const image = await createImage(data, service);
+        res.send(image);
+      }
+    }
   });
   req.pipe(busboy);
 })
 
-function createMedia(obj) {
-  Media.create(obj)
+function checkService(service) {
+  const serv = Service.findOne(service);
+  return serv;
 }
 
-function checkType(path) {
-  path.map(url => {
-    if (url.mimetype === "image/jpeg" || url.mimetype === "image/png") {
-      resizeImageSmall(url)
-    }
-    if (url.mimetype === "video/mp4") {
-      coverVideo(url)
-    }
-  })
+function createVideo(data, coverId, service) {
+  const queryVideo = {
+    host: service.host,
+    path: data.path,
+    type: data.mimetype,
+    fileName: data.fileName,
+    serviceId: service._id,
+    coverId: [coverId]
+  }
+  const vod = Video.create(queryVideo);
+  return vod;
 }
+
+function findVideo(videoId) {
+  const video = Video.findById(videoId)
+    .populate({
+      path: 'coverId',
+      model: 'Cover',
+      match: { deleted: false },
+    });
+  return video;
+}
+
+function createCover(cover, service) {
+  const queryCover = {
+    host: service.host,
+    path: cover.path,
+    type: cover.mimetype,
+    fileName: cover.fileName,
+    serviceId: service._id
+  }
+  const newCover = Cover.create(queryCover);
+  return newCover;
+}
+
+function coverVideo(url) {
+  let filename = url.split('/');
+  filename = filename[7].split('.');
+  const coverSmall = __dirname + '/uploads/coverVideoSmall/' + filename[0] + '.jpg';
+  exec(`ffmpeg -loglevel debug -y -i "${url}" -frames 10 -q:v 1 -vf fps=1 ${coverSmall}`);
+  const result = {
+    path: coverSmall,
+    fileName: filename[0] + '.jpg',
+    mimetype: 'image/jpg'
+  }
+  return result;
+
+}
+
+function createImage(data, service) {
+  const queryImage = {
+    host: service.host,
+    path: data.path,
+    type: data.mimetype,
+    fileName: data.fileName,
+    serviceId: service._id,
+    size: data.size
+  }
+  const image = Image.create(queryImage);
+  return image;
+}
+
 
 function resizeImageSmall(url) {
   const width = 300;
@@ -143,15 +191,7 @@ function resizeImageSmall(url) {
     })
 }
 
-function coverVideo(url) {
-  let filename = url.path.split('/');
-  filename = filename[7].split('.');
-  console.log('filename', filename);
-  const coverSmall = __dirname + '/uploads/coverVideoSmall/' + filename[0] + '.jpg';
 
-  console.log('coverSmall', coverSmall, url.path);
-  exec(`ffmpeg -loglevel debug -y -i "${url.path}" -frames 10 -q:v 1 -vf fps=1 ${coverSmall}`);
-}
 
 var server = app.listen(8081, function() {
   var host = server.address().address
