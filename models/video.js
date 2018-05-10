@@ -4,9 +4,8 @@ var Schema = mongoose.Schema;
 var videoSchema = new Schema({
   host: {
     type: Schema.Types.String,
-    required: true
   },
-  name: {
+  path: {
     type: Schema.Types.String,
     required: true
   },
@@ -14,12 +13,31 @@ var videoSchema = new Schema({
     type: Schema.Types.String,
     required: true
   },
-  mediaId: {
+  fileName: {
+    type: Schema.Types.String,
+    required: true
+  },
+  serviceId: {
     type: Schema.Types.ObjectId,
-    ref: 'Media'
+    ref: 'Service'
+  },
+  coverId: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Cover'
+  }],
+  createAt: {
+    type: Schema.Types.Date,
+    default: Date.now
+  },
+  updateAt: {
+    type: Schema.Types.Date
+  },
+  deleted: {
+    type :Schema.Types.Boolean,
+    default: false
   }
 });
 
 // Compile model from schema
-var Video = mongoose.model('Project', videoSchema);
+var Video = mongoose.model('Video', videoSchema);
 module.exports = Video;
