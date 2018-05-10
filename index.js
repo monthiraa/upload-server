@@ -52,7 +52,6 @@ app.post('/service', urlencodedParser, function(req, res) {
 })
 
 app.post('/upload', async (req, res) => {
-  // console.log("------body: "+req.body);
   let dir;
   var busboy = new Busboy({
     headers: req.headers
@@ -65,6 +64,17 @@ app.post('/upload', async (req, res) => {
     data[fieldname] = val;
     await busboy.on('field', async () => {
       service = await checkService(data);
+      if (!service) {
+        res.writeHead(500, {
+          'Connection': 'close'
+        });
+        res.end({
+          error: {
+            errorCode: 500,
+            message: 'Service not found'
+          }
+        });
+      }
     });
   });
 
@@ -91,23 +101,38 @@ app.post('/upload', async (req, res) => {
   })
 
   busboy.on('finish', async () => {
-    if (service && data) {
-      if (data.mimetype === "video/mp4") {
-        const coverVod = await coverVideo(data.path);
-        const cover = await createCover(coverVod, service);
-        const video = await createVideo(data, cover._id, service);
-        const myVideo = await findVideo(video._id)
-        res.send(myVideo);
+    try {
+      if (service && data) {
+        if (data.mimetype === "video/mp4") {
+          const coverVod = await coverVideo(data.path);
+          const cover = await createCover(coverVod, service);
+          const video = await createVideo(data, cover._id, service);
+          const myVideo = await findVideo(video._id)
+          res.send(myVideo);
+        } else {
+          const image = await createImage(data, service);
+          res.send(image);
+        }
       } else {
-        const image = await createImage(data, service);
-        res.send(image);
+        res.writeHead(500, {
+          'Connection': 'close'
+        });
+        res.end({
+          error: {
+            errorCode: 500,
+            message: 'Upload fail'
+          }
+        });
+
       }
+    } catch (e) {
+      // console.log(e);
     }
   });
   req.pipe(busboy);
 })
 
-function checkService(service) {
+function checkService(service, res) {
   const serv = Service.findOne(service);
   return serv;
 }
@@ -130,7 +155,9 @@ function findVideo(videoId) {
     .populate({
       path: 'coverId',
       model: 'Cover',
-      match: { deleted: false },
+      match: {
+        deleted: false
+      },
     });
   return video;
 }
@@ -189,6 +216,7 @@ function resizeImageSmall(url) {
         .write(`${pathSmall}`); // set JPEG quality })
     })
 }
+
 
 
 
